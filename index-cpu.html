@@ -1,0 +1,66 @@
+<style>
+input[type="range"] {
+	display: block;
+	width: 512px;
+}
+</style>
+
+<canvas id="canvas" width="512" height="512"></canvas>
+
+<script type="module">
+
+import {perlin} from "./perlin-cpu.js";
+
+let ctx = canvas.getContext("2d");
+let noise = perlin(1);
+let time = 0;
+let last = 0;
+let now = 0;
+
+requestAnimationFrame(function frame() {
+	now = performance.now() / 1000;
+	last = last || now;
+	time += (now - last) * speed.value;
+	last = now;
+
+	let img_data = ctx.createImageData(canvas.width, canvas.height);
+
+	for(let y=0, i=0; y < canvas.height; y++) {
+		for(let x=0; x < canvas.width; x++, i+=4) {
+			let u = x / canvas.width + time;
+			let v = y / canvas.height - time;
+			v = 1 - v;
+			let w = time * 0.125;
+			let val = noise.fractal3d(+octaves.value, u, v, w);
+			val += +level.value;
+			val *= +amplitude.value;
+			val = Math.max(val, 0);
+			val = 1 - 1 / (val + 1);
+			let r = 0.75 * 0.25 * (1-val) + val;
+			let g = 0.75 * 0.5  * (1-val) + val;
+			let b = 0.75 * 1    * (1-val) + val;
+			let a = 1;
+			img_data.data[i+0] = r * 255;
+			img_data.data[i+1] = g * 255;
+			img_data.data[i+2] = b * 255;
+			img_data.data[i+3] = a * 255;
+		}
+	}
+
+	ctx.putImageData(img_data, 0, 0);
+
+	requestAnimationFrame(frame);
+});
+
+</script>
+
+<div>
+	Speed:
+	<input type="range" value="0" min="0" max="1" step="any" id="speed">
+	Octaves:
+	<input type="range" value="8" min="1" max="8" step="1" id="octaves">
+	Amplitude:
+	<input type="range" value="32" min="1" max="256" step="1" id="amplitude">
+	Level:
+	<input type="range" value="0" min="-0.25" max="0.25" step="any" id="level">
+</div>

@@ -1,0 +1,113 @@
+<style>
+input[type="range"] {
+	display: block;
+	width: 512px;
+}
+</style>
+
+<canvas id="canvas" width="512" height="512"></canvas>
+
+<script type="module">
+
+import {gen_table_tex, glsl_code} from "./perlin-gpu.js";
+
+let vert_src = `#version 300 es
+	out vec2 uv;
+
+	void main()
+	{
+		uv = vec2(gl_VertexID % 2, gl_VertexID / 2);
+		gl_Position = vec4(uv * 2.0 - 1.0, 0, 1);
+	}
+`;
+
+let frag_src = `#version 300 es
+	#line 20
+	precision highp float;
+
+	${glsl_code}
+
+	uniform sampler2D table;
+	uniform float time;
+	uniform int octaves;
+	uniform float amplitude;
+	uniform float level;
+	in vec2 uv;
+	out vec4 color;
+
+	void main()
+	{
+		vec3 v  = vec3(uv + time, time * 0.125);
+		float val = fractal(table, v, octaves);
+		val += level;
+		val *= amplitude;
+		val = max(val, 0.0);
+		val = 1.0 - 1.0 / (val + 1.0);
+		color = vec4(mix(0.75 * vec3(0.25, 0.5, 1), vec3(1), val), 1);
+	}
+`;
+
+let gl = canvas.getContext("webgl2", {antialias: false});
+let vert = gl.createShader(gl.VERTEX_SHADER);
+let frag = gl.createShader(gl.FRAGMENT_SHADER);
+let prog = gl.createProgram();
+let table = gen_table_tex(gl, 1);
+let time = 0;
+let last = 0;
+let now = 0;
+
+gl.shaderSource(vert, vert_src);
+gl.shaderSource(frag, frag_src);
+gl.compileShader(vert);
+gl.compileShader(frag);
+
+if(gl.getShaderParameter(vert, gl.COMPILE_STATUS) === false) {
+	throw "error: " + gl.getShaderInfoLog(vert);
+}
+
+if(gl.getShaderParameter(frag, gl.COMPILE_STATUS) === false) {
+	throw "error: " + gl.getShaderInfoLog(frag);
+}
+
+gl.attachShader(prog, vert);
+gl.attachShader(prog, frag);
+gl.linkProgram(prog);
+
+if(gl.getProgramParameter(prog, gl.LINK_STATUS) === false) {
+	throw "error: " + gl.getProgramInfoLog(prog);
+}
+
+requestAnimationFrame(function frame() {
+	now = performance.now() / 1000;
+	last = last || now;
+	time += (now - last) * speed.value;
+	last = now;
+
+	gl.useProgram(prog);
+
+	gl.uniform1f(gl.getUniformLocation(prog, "time"), time);
+	gl.uniform1i(gl.getUniformLocation(prog, "octaves"), octaves.value);
+	gl.uniform1f(gl.getUniformLocation(prog, "amplitude"), amplitude.value);
+	gl.uniform1f(gl.getUniformLocation(prog, "level"), level.value);
+
+	gl.activeTexture(gl.TEXTURE0 + 0);
+	gl.bindTexture(gl.TEXTURE_2D, table);
+	gl.uniform1i(gl.getUniformLocation(prog, "table"), 0);
+
+	gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+	requestAnimationFrame(frame);
+});
+
+</script>
+
+<div>
+	Speed:
+	<input type="range" value="0" min="0" max="1" step="any" id="speed">
+	Octaves:
+	<input type="range" value="8" min="1" max="8" step="1" id="octaves">
+	Amplitude:
+	<input type="range" value="32" min="1" max="256" step="1" id="amplitude">
+	Level:
+	<input type="range" value="0" min="-0.25" max="0.25" step="any" id="level">
+</div>
