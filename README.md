@@ -2,6 +2,8 @@
 
 Perlin Noise JavaScript library
 
+[WebGL Realtime Demo](https://guckstift.github.io/perlin/index-gpu.html)
+
 ![Example](example.png)
 
 Generate beautiful clouds in real time:
